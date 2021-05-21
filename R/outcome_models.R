@@ -28,12 +28,12 @@ fit_prog_reg <- function(X, y, trt, alpha=1, lambda=NULL,
     if(!requireNamespace("glmnet", quietly = TRUE)) {
         stop("In order to fit an elastic net outcome model, you must install the glmnet package.")
     }
-    
+
     extra_params = list(...)
     if (length(extra_params) > 0) {
         warning("Unused parameters when using elastic net: ", paste(names(extra_params), collapse = ", "))
     }
-    
+
     X <- matrix(poly(matrix(X),degree=poly_order), nrow=dim(X)[1])
 
     ## helper function to fit regression with CV
@@ -45,7 +45,7 @@ fit_prog_reg <- function(X, y, trt, alpha=1, lambda=NULL,
         }
         fit <- glmnet::glmnet(x, y, alpha=alpha,
                               lambda=lam)
-        
+
         return(as.matrix(coef(fit)))
     }
 
@@ -101,13 +101,13 @@ fit_prog_rf <- function(X, y, trt, avg=FALSE, ...) {
     if(!requireNamespace("randomForest", quietly = TRUE)) {
         stop("In order to fit a random forest outcome model, you must install the randomForest package.")
     }
-    
+
     extra_params = list(...)
     if (length(extra_params) > 0) {
         warning("Unused parameters when using random forest: ", paste(names(extra_params), collapse = ", "))
     }
 
-    
+
     ## helper function to fit RF
     outfit <- function(x, y) {
             fit <- randomForest::randomForest(x, y)
@@ -128,23 +128,23 @@ fit_prog_rf <- function(X, y, trt, avg=FALSE, ...) {
         ## predict outcome
         y0hat <- matrix(predict(fit, X), ncol=1)
 
-        
+
         ## keep feature importances
         imports <- randomForest::importance(fit)
 
-        
+
     } else {
         ## fit separate regressions for each post period
         fits <- apply(as.matrix(y), 2,
                       function(yt) outfit(X[trt==0,],
                                           yt[trt==0]))
-        
+
         ## predict outcome
         y0hat <- lapply(fits, function(fit) as.matrix(predict(fit,X))) %>%
             bind_rows() %>%
             as.matrix()
 
-        
+
         ## keep feature importances
         imports <- lapply(fits, function(fit) randomForest::importance(fit)) %>%
             bind_rows() %>%
@@ -155,7 +155,7 @@ fit_prog_rf <- function(X, y, trt, avg=FALSE, ...) {
 
     return(list(y0hat=y0hat,
                 params=imports))
-    
+
 }
 
 
@@ -181,7 +181,7 @@ fit_prog_gsynth <- function(X, y, trt, r=0, r.end=5, force=3, CV=1, ...) {
     if (length(extra_params) > 0) {
         warning("Unused parameters when using gSynth: ", paste(names(extra_params), collapse = ", "))
     }
-    
+
     df_x = data.frame(X, check.names=FALSE)
     df_x$unit = rownames(df_x)
     df_x$trt = rep(0, nrow(df_x))
@@ -197,7 +197,7 @@ fit_prog_gsynth <- function(X, y, trt, r=0, r.end=5, force=3, CV=1, ...) {
 
     transform(long_df, time = as.numeric(time))
     transform(long_df, unit = as.numeric(unit))
-    gsyn <- gsynth::gsynth(data = long_df, Y = "obs", D = "trt", 
+    gsyn <- gsynth::gsynth(data = long_df, Y = "obs", D = "trt",
                            index = c("unit", "time"), force = force, CV = CV, r = r)
 
     t0 <- dim(X)[2]
@@ -241,18 +241,18 @@ fit_prog_mcpanel <- function(X, y, trt, unit_fixed=1, time_fixed=1, ...) {
     if(!requireNamespace("MCPanel", quietly = TRUE)) {
         stop("In order to fit matrix completion, you must install the MCPanel package.")
     }
-    
+
     extra_params = list(...)
     if (length(extra_params) > 0) {
         warning("Unused parameters when using MCPanel: ", paste(names(extra_params), collapse = ", "))
     }
-    
+
     ## create matrix and missingness matrix
 
     t0 <- dim(X)[2]
     t_final <- t0 + dim(y)[2]
-    n <- dim(X)[1]    
-    
+    n <- dim(X)[1]
+
     fullmat <- cbind(X, y)
     maskmat <- matrix(1, nrow=nrow(fullmat), ncol=ncol(fullmat))
     maskmat[trt==1, (t0+1):t_final] <- 0
@@ -260,13 +260,13 @@ fit_prog_mcpanel <- function(X, y, trt, unit_fixed=1, time_fixed=1, ...) {
     ## estimate matrix
     mcp <- MCPanel::mcnnm_cv(fullmat, maskmat,
                              to_estimate_u=unit_fixed, to_estimate_v=time_fixed)
-    
+
     ## impute matrix
     imp_mat <- mcp$L +
         sweep(matrix(0, nrow=nrow(fullmat), ncol=ncol(fullmat)), 1, mcp$u, "+") + # unit fixed
         sweep(matrix(0, nrow=nrow(fullmat), ncol=ncol(fullmat)), 2, mcp$v, "+") # time fixed
-    
-    
+
+
     trtmat <- matrix(0, ncol=n, nrow=t_final)
     trtmat[t0:t_final, trt == 1] <- 1
 
@@ -283,7 +283,7 @@ fit_prog_mcpanel <- function(X, y, trt, unit_fixed=1, time_fixed=1, ...) {
     params$Y.ct <- t(imp_mat[trt==1,,drop=FALSE])
     return(list(y0hat=y0hat,
                 params=params))
-    
+
 }
 
 
@@ -308,7 +308,7 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
     if (length(extra_params) > 0) {
         warning("Unused parameters when using CITS: ", paste(names(extra_params), collapse = ", "))
     }
-    
+
     ## combine back into a panel structure
     ids <- 1:nrow(X)
     t0 <- dim(X)[2]
@@ -319,7 +319,7 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
     if(is.null(weights)) {
         weights <- rep(1, n)
     }
-    
+
     pnl1 <- data.frame(X)
     colnames(pnl1) <- 1:(t0)
 
@@ -332,23 +332,23 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
     pnl2 <- pnl2 %>% mutate(trt=trt, post=1, id=ids, weight=weights) %>%
         gather(time, val, -trt, -post, -id, -weight) %>%
         mutate(time=as.numeric(time))
-    
-    
+
+
     pnl <- bind_rows(pnl1, pnl2)
-    
+
     ## fit regression
     if(poly_order == "fixed") {
         fit <- pnl %>%
             filter(!((post==1) & (trt==1))) %>% ## filter out post-period treated outcomes
             lm(val ~  as.factor(id) + as.factor(time),
               .,
-              weights = .$weight 
+              weights = .$weight
               )
     } else if(poly_order > 0) {
         fit <- pnl %>%
             filter(!((post==1) & (trt==1))) %>% ## filter out post-period treated outcomes
         lm(val ~ poly(time, poly_order) + post + trt + poly(time * trt, poly_order),
-              ., 
+              .,
               weights = .$weight
               )
     } else {
@@ -357,13 +357,13 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
             filter(!((post==1) & (trt==1))) %>% ## filter out post-period treated outcomes
             lm(val ~  post + trt,
               .,
-              weights = .$weight 
+              weights = .$weight
               )
     }
 
-    
+
     ## get predicted post-period outcomes
-    
+
     y0hat <- matrix(0, nrow=n, ncol=(t_final-t0))
     y0hat[trt==0,]  <- matrix(predict(fit,
                                       pnl %>% filter(post==1 & trt==0)),
@@ -376,7 +376,7 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
 
     params <- list()
 
-    
+
     ## add treated prediction for whole pre-period
     params$Y.ct <- matrix(predict(fit,
                                   pnl %>% filter(trt==1),
@@ -389,15 +389,15 @@ fit_prog_cits <- function(X, y, trt, poly_order=1, weights=NULL, ...) {
 
     ## control and treated residuals
     params$ctrl_resids <- t(cbind(X[trt==0,,drop=FALSE],
-                                y[trt==0,,drop=FALSE])) - 
+                                y[trt==0,,drop=FALSE])) -
         t(ctrl_pred)
     params$trt_resids <- colMeans(cbind(X[trt==1,,drop=FALSE],
                                             y[trt==1,,drop=FALSE])) -
         rowMeans(params$Y.ct)
-    
+
     return(list(y0hat=y0hat,
                 params=params))
-    
+
 }
 
 
@@ -420,7 +420,7 @@ fit_prog_causalimpact <- function(X, y, trt, ...) {
     if(!requireNamespace("CausalImpact", quietly = TRUE)) {
         stop("In order to fit bayesian structural time series, you must install the CausalImpact package.")
     }
-    
+
     extra_params = list(...)
     if (length(extra_params) > 0) {
         warning("Unused parameters using Bayesian structural time series with CausalImpact: ", paste(names(extra_params), collapse = ", "))
@@ -436,7 +436,7 @@ fit_prog_causalimpact <- function(X, y, trt, ...) {
 
     imp_dat <- t(rbind(colMeans(comb[trt==1,,drop=F]), comb[trt==0,,drop=F]))
 
-    
+
     ## get predicted post-period outcomes
     ## TODO: is this the way to use CausalImpact??
     ci_func <- function(i) {
@@ -444,14 +444,14 @@ fit_prog_causalimpact <- function(X, y, trt, ...) {
         CausalImpact::CausalImpact(t(rbind(comb[i,], comb[-i,][trt[-i]==0,])),
                                    pre.period=c(1, t0), post.period=c(t0+1, t_final)
                                    )$series$point.pred
-        
+
     }
 
     y0hat <- t(sapply(1:n, ci_func))
 
     params <- list()
 
-    
+
     ## add treated prediction for whole pre-period
     params$Y.ct <- t(y0hat[trt==1,,drop=F])
 
@@ -460,15 +460,15 @@ fit_prog_causalimpact <- function(X, y, trt, ...) {
 
     ## control and treated residuals
     params$ctrl_resids <- t(cbind(X[trt==0,,drop=FALSE],
-                                y[trt==0,,drop=FALSE])) - 
+                                y[trt==0,,drop=FALSE])) -
         t(ctrl_pred)
-    
+
     params$trt_resids <- colMeans(cbind(X[trt==1,,drop=FALSE],
                                             y[trt==1,,drop=FALSE])) -
         rowMeans(params$Y.ct)
     return(list(y0hat=y0hat[,(t0+1):t_final, drop=F],
                 params=params))
-    
+
 }
 
 
@@ -500,12 +500,12 @@ fit_prog_seq2seq <- function(X, y, trt,
     if(!requireNamespace("keras", quietly = TRUE)) {
         stop("In order to fit a neural network, you must install the keras package.")
     }
-    
+
     extra_params = list(...)
     if (length(extra_params) > 0) {
         warning("Unused parameters when building sequence to sequence learning with feedforward nets: ", paste(names(extra_params), collapse = ", "))
     }
-    
+
     ## structure data accordingly
     ids <- 1:nrow(X)
     t0 <- dim(X)[2]
@@ -530,7 +530,7 @@ fit_prog_seq2seq <- function(X, y, trt,
     model %>% keras::layer_dense(units=ncol(yctrl))
 
     ## compile
-    model %>% keras::compile(optimizer="rmsprop", loss="mse", metrics=c("mae")) 
+    model %>% keras::compile(optimizer="rmsprop", loss="mse", metrics=c("mae"))
 
     ## fit model
     learn <- model %>%
@@ -544,10 +544,44 @@ fit_prog_seq2seq <- function(X, y, trt,
     ## predict for everything
     y0hat <- model %>% predict(X)
     params=list(model=model, learn=learn)
-    
+
     return(list(y0hat=y0hat,
                 params=params))
 }
 
 
 
+
+fit_prog_gam <- function(X, y, trt, ...) {
+
+    y0 <- y[trt == 0,]
+    X0 <- X[trt == 0,]
+
+    gamfit <- apply(as.matrix(y0), 2, function(yt) fgam(yt ~ af(X0), presmooth = TRUE))
+    gamweights <- map(gamfit, coef)
+
+    ## Get predicted values
+    y0hat <- map(gamfit, ~predict(., newdata = list(X0 = X), type = 'response')) %>%
+      bind_cols %>%
+      as.matrix
+
+    return(list(y0hat = y0hat,
+                params  = gamweights))
+}
+
+fit_prog_flm <- function(X, y, trt, ...) {
+
+    y0 <- y[trt == 0,]
+    X0 <- X[trt == 0,]
+
+    gamfit <- apply(as.matrix(y0), 2, function(yt) fgam(yt ~ lf(X0), presmooth = TRUE))
+    gamweights <- map(gamfit, coef)
+
+    ## Get predicted values
+    y0hat <- map(gamfit, ~predict(., newdata = list(X0 = X), type = 'response')) %>%
+        bind_cols %>%
+        as.matrix
+
+    return(list(y0hat = y0hat,
+                params  = gamweights))
+}

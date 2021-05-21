@@ -13,12 +13,12 @@
 #'          \item{"scaled_l2_imbalance"}{L2 imbalance scaled by L2 imbalance of uniform weights}
 #' }
 fit_zero_weights <- function(synth_data) {
-    
+
     ## Imbalance is uniform weights imbalance
     uni_w <- matrix(1/ncol(synth_data$Z0), nrow=ncol(synth_data$Z0), ncol=1)
     unif_l2_imbalance <- sqrt(sum((synth_data$Z0 %*% uni_w - synth_data$Z1)^2))
     scaled_l2_imbalance <- 1
-    
+
     return(list(weights=rep(0, ncol(synth_data$Z0)),
                 l2_imbalance=unif_l2_imbalance,
                 scaled_l2_imbalance=scaled_l2_imbalance))
@@ -47,18 +47,18 @@ fit_augsyn_formatted <- function(wide_data, synth_data,
     X <- wide_data$X
     y <- wide_data$y
     trt <- wide_data$trt
-    
+
     ## fit prognostic scores
     fitout <- do.call(fit_progscore,
                           list(X=X, y=y, trt=trt, ...))
-    
+
     ## fit synth
     syn <- fit_weights(synth_data)
 
     syn$params <- fitout$params
 
     syn$mhat <- fitout$y0hat
-    
+
     return(syn)
 }
 
@@ -99,6 +99,10 @@ fit_augsyn <- function(wide_data, synth_data,
         progf <- fit_prog_causalimpact
     } else if(progfunc == "seq2seq"){
         progf <- fit_prog_seq2seq
+    } else if(progfunc == "gam"){
+        progf <- fit_prog_gam
+    } else if(progfunc == "flm"){
+        progf <- fit_prog_flm
     } else {
         stop("progfunc must be one of 'EN', 'RF', 'GSYN', 'MCP', 'CITS', 'CausalImpact', 'seq2seq'")
     }
@@ -142,27 +146,27 @@ fit_residaug_formatted <- function(wide_data, synth_data,
     ## fit prognostic scores
     fitout <- do.call(fit_progscore, list(X=X, y=y, trt=trt, ...))
 
-    
+
     y0hat <- fitout$y0hat
 
     ## get residuals
     ctrl_resids <- fitout$params$ctrl_resids
     trt_resids <- fitout$params$trt_resids
-    
+
     ## replace outcomes with pre-period residuals
     t0 <- dim(X)[2]
 
     synth_data$Z0 <- ctrl_resids[1:t0, ]
     synth_data$Z1 <- as.matrix(trt_resids[1:t0])
-    
+
     ## fit synth weights
     syn <- fit_weights(synth_data)
 
-    syn$params <- fitout$params    
+    syn$params <- fitout$params
 
     ## return predicted values for treatment and control
     syn$mhat <- y0hat
-    
+
     return(syn)
 }
 #' Fit outcome model and balance residuals
@@ -201,7 +205,7 @@ fit_residaug <- function(wide_data, synth_data,
         stop("progfunc must be one of 'GSYN', 'MCP', 'CITS', 'CausalImpact'")
     }
 
-    
+
     ## weight function to use
     if(weightfunc == "SCM") {
         weightf <- fit_synth_formatted
